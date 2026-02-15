@@ -48,7 +48,8 @@ app.get('/api/tasks', (req, res) => {
 // GET single task
 app.get('/api/tasks/:id', (req, res) => {
   // BUG #2: parseInt not used - string comparison fails
-  const task = tasks.find(t => t.id === req.params.id); // should be parseInt(req.params.id)
+  const task = tasks.find(t => t.id === parseInt(req.params.id));
+  //const task = tasks.find(t => t.id === req.params.id); // should be parseInt(req.params.id)
   if (!task) return res.status(404).json({ error: 'Task not found' });
   res.json(task);
 });
