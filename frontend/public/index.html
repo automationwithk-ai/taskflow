@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow — AI-Powered Task Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --border: #222222;
+      --accent: #e8ff47;
+      --accent2: #ff4757;
+      --text: #cccccc;
+      --text-dim: #555555;
+      --text-bright: #ffffff;
+      --critical: #ff4757;
+      --high: #ff6b35;
+      --medium: #ffa502;
+      --low: #2ed573;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+    }
+
+    /* Noise texture overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.4;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: rgba(10,10,10,0.95);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text-bright);
+      letter-spacing: -1px;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      font-size: 10px;
+      letter-spacing: 1px;
+    }
+
+    .live-dot {
+      width: 5px;
+      height: 5px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    .main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+
+    /* Stats bar */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: 40px;
+    }
+
+    .stat {
+      background: var(--surface);
+      padding: 20px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--accent);
+      transform: scaleX(0);
+      transition: transform 0.4s ease;
+    }
+
+    .stat:hover::before { transform: scaleX(1); }
+
+    .stat-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--text-bright);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .toolbar-left {
+      display: flex;
+      gap: 8px;
+    }
+
+    .filter-btn {
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: all 0.15s;
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(232,255,71,0.05);
+    }
+
+    .add-btn {
+      padding: 8px 20px;
+      background: var(--accent);
+      border: none;
+      color: #000;
+      font-family: 'Syne', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: all 0.15s;
+    }
+
+    .add-btn:hover { background: #fff; }
+
+    /* Task list */
+    .tasks {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .task {
+      background: var(--surface);
+      padding: 16px 24px;
+      display: grid;
+      grid-template-columns: 24px 1fr auto auto auto;
+      align-items: center;
+      gap: 16px;
+      transition: background 0.15s;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-8px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .task:hover { background: #161616; }
+
+    .task-check {
+      width: 18px;
+      height: 18px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+
+    .task-check:hover { border-color: var(--accent); }
+    .task-check.done { background: var(--accent); border-color: var(--accent); }
+
+    .task-check.done::after {
+      content: '✓';
+      color: #000;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .task-title {
+      font-size: 13px;
+      color: var(--text-bright);
+      font-weight: 400;
+    }
+
+    .task-title.done-text {
+      text-decoration: line-through;
+      color: var(--text-dim);
+    }
+
+    .task-assignee {
+      font-size: 11px;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .priority-badge {
+      padding: 3px 8px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: 1px solid;
+      white-space: nowrap;
+    }
+
+    .priority-critical { color: var(--critical); border-color: var(--critical); background: rgba(255,71,87,0.08); }
+    .priority-high { color: var(--high); border-color: var(--high); background: rgba(255,107,53,0.08); }
+    .priority-medium { color: var(--medium); border-color: var(--medium); background: rgba(255,165,2,0.08); }
+    .priority-low { color: var(--low); border-color: var(--low); background: rgba(46,213,115,0.08); }
+
+    .status-badge {
+      padding: 3px 8px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .status-open { color: var(--text-dim); }
+    .status-in-progress { color: var(--accent); }
+    .status-done { color: var(--low); }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+      transition: color 0.15s;
+      opacity: 0;
+    }
+
+    .task:hover .delete-btn { opacity: 1; }
+    .delete-btn:hover { color: var(--critical); }
+
+    /* Add task modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 32px;
+      width: 480px;
+      animation: modalIn 0.2s ease;
+    }
+
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-bright);
+      margin-bottom: 24px;
+      letter-spacing: -0.5px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      padding: 10px 12px;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus { border-color: var(--accent); }
+
+    .form-group select option { background: var(--surface); }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 24px;
+    }
+
+    .btn-primary {
+      flex: 1;
+      padding: 10px;
+      background: var(--accent);
+      border: none;
+      color: #000;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-primary:hover { background: #fff; }
+
+    .btn-secondary {
+      padding: 10px 20px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+
+    .empty {
+      padding: 60px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 13px;
+      background: var(--surface);
+    }
+
+    .gitagent-banner {
+      margin-top: 40px;
+      border: 1px solid var(--border);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, #111 0%, #0d1a00 100%);
+    }
+
+    .gitagent-banner p {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .gitagent-banner strong {
+      color: var(--accent);
+      font-family: 'Syne', sans-serif;
+    }
+
+    .gitagent-link {
+      padding: 8px 16px;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-size: 11px;
+      text-decoration: none;
+      letter-spacing: 1px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .gitagent-link:hover {
+      background: var(--accent);
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Task<span>Flow</span></div>
+  <div class="header-right">
+    <span>automationwithk-ai</span>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div class="stats" id="stats">
+    <div class="stat"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total</div></div>
+    <div class="stat"><div class="stat-value" id="stat-open">—</div><div class="stat-label">Open</div></div>
+    <div class="stat"><div class="stat-value" id="stat-progress">—</div><div class="stat-label">In Progress</div></div>
+    <div class="stat"><div class="stat-value" id="stat-done">—</div><div class="stat-label">Done</div></div>
+    <div class="stat"><div class="stat-value" id="stat-critical" style="color:var(--critical)">—</div><div class="stat-label">Critical</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button class="filter-btn active" onclick="filterTasks('all', this)">ALL</button>
+      <button class="filter-btn" onclick="filterTasks('open', this)">OPEN</button>
+      <button class="filter-btn" onclick="filterTasks('in-progress', this)">IN PROGRESS</button>
+      <button class="filter-btn" onclick="filterTasks('done', this)">DONE</button>
+    </div>
+    <button class="add-btn" onclick="showModal()">+ NEW TASK</button>
+  </div>
+
+  <div class="tasks" id="task-list">
+    <div class="empty">Loading tasks...</div>
+  </div>
+
+  <div class="gitagent-banner">
+    <div>
+      <p>Powered by <strong>GitAgent Master</strong> — AI agents monitoring this repo 24/7</p>
+      <p style="margin-top:4px;font-size:11px;">PRs reviewed · Issues tracked · Deployments monitored</p>
+    </div>
+    <a href="http://34.100.156.81:3000" target="_blank" class="gitagent-link">VIEW AGENTS →</a>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>New Task</h2>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="task-title" placeholder="What needs to be done?">
+    </div>
+    <div class="form-group">
+      <label>Priority</label>
+      <select id="task-priority">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="critical">Critical</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Assignee</label>
+      <input type="text" id="task-assignee" placeholder="username">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="createTask()">CREATE TASK</button>
+      <button class="btn-secondary" onclick="hideModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'https://taskflow-api.onrender.com'; // will update after deploy
+  let allTasks = [];
+  let currentFilter = 'all';
+
+  async function loadStats() {
+    try {
+      const res = await fetch(`${API}/api/stats`);
+      const data = await res.json();
+      document.getElementById('stat-total').textContent = data.total;
+      document.getElementById('stat-open').textContent = data.open;
+      document.getElementById('stat-progress').textContent = data.inProgress;
+      document.getElementById('stat-done').textContent = data.done;
+      document.getElementById('stat-critical').textContent = data.critical;
+    } catch(e) {
+      console.log('Using local data');
+    }
+  }
+
+  async function loadTasks() {
+    try {
+      const res = await fetch(`${API}/api/tasks`);
+      allTasks = await res.json();
+    } catch(e) {
+      // Fallback demo data
+      allTasks = [
+        { id: 1, title: 'Setup CI/CD pipeline', status: 'done', priority: 'high', assignee: 'kshitij' },
+        { id: 2, title: 'Write unit tests', status: 'in-progress', priority: 'medium', assignee: 'dev1' },
+        { id: 3, title: 'Fix memory leak in auth service', status: 'open', priority: 'critical', assignee: 'dev2' },
+        { id: 4, title: 'Update dependencies', status: 'open', priority: 'low', assignee: 'kshitij' },
+        { id: 5, title: 'Deploy to production', status: 'open', priority: 'high', assignee: 'dev1' },
+      ];
+    }
+    renderTasks();
+  }
+
+  function renderTasks() {
+    const list = document.getElementById('task-list');
+    let tasks = allTasks;
+    if (currentFilter !== 'all') tasks = tasks.filter(t => t.status === currentFilter);
+
+    if (tasks.length === 0) {
+      list.innerHTML = '<div class="empty">No tasks found.</div>';
+      return;
+    }
+
+    list.innerHTML = tasks.map(task => `
+      <div class="task" id="task-${task.id}">
+        <div class="task-check ${task.status === 'done' ? 'done' : ''}" onclick="toggleTask(${task.id})"></div>
+        <div class="task-title ${task.status === 'done' ? 'done-text' : ''}">${task.title}</div>
+        <div class="task-assignee">@${task.assignee || 'unassigned'}</div>
+        <span class="priority-badge priority-${task.priority}">${task.priority}</span>
+        <span class="status-badge status-${task.status.replace('-','-')}">${task.status}</span>
+        <button class="delete-btn" onclick="deleteTask(${task.id})">×</button>
+      </div>
+    `).join('');
+  }
+
+  function filterTasks(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTasks();
+  }
+
+  async function toggleTask(id) {
+    const task = allTasks.find(t => t.id === id);
+    if (!task) return;
+    const newStatus = task.status === 'done' ? 'open' : 'done';
+    try {
+      await fetch(`${API}/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch(e) {}
+    task.status = newStatus;
+    renderTasks();
+    loadStats();
+  }
+
+  async function deleteTask(id) {
+    try {
+      await fetch(`${API}/api/tasks/${id}`, { method: 'DELETE' });
+    } catch(e) {}
+    allTasks = allTasks.filter(t => t.id !== id);
+    renderTasks();
+    loadStats();
+  }
+
+  function showModal() {
+    document.getElementById('modal').classList.add('show');
+    document.getElementById('task-title').focus();
+  }
+
+  function hideModal() {
+    document.getElementById('modal').classList.remove('show');
+    document.getElementById('task-title').value = '';
+    document.getElementById('task-assignee').value = '';
+  }
+
+  async function createTask() {
+    const title = document.getElementById('task-title').value;
+    const priority = document.getElementById('task-priority').value;
+    const assignee = document.getElementById('task-assignee').value;
+
+    try {
+      const res = await fetch(`${API}/api/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, priority, assignee })
+      });
+      const task = await res.json();
+      allTasks.unshift(task);
+    } catch(e) {
+      // Fallback
+      allTasks.unshift({ id: Date.now(), title, priority, assignee, status: 'open' });
+    }
+
+    hideModal();
+    renderTasks();
+    loadStats();
+  }
+
+  // Close modal on overlay click
+  document.getElementById('modal').addEventListener('click', function(e) {
+    if (e.target === this) hideModal();
+  });
+
+  // Init
+  loadStats();
+  loadTasks();
+</script>
+</body>
+</html>
