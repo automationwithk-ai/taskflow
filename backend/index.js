@@ -18,9 +18,9 @@ let nextId = 6;
 
 // BUG #1: No input validation - allows empty titles
 app.post('/api/tasks', (req, res) => {
-  const { title, priority, assignee } = req.body;
+  //const { title, priority, assignee } = req.body;
   // Missing: if (!title) return res.status(400).json({ error: 'Title required' });
-  
+  if (title === null) return res.status(400).json({ error: 'Title required' });
   const task = {
     id: nextId++,
     title,
@@ -64,11 +64,15 @@ app.put('/api/tasks/:id', (req, res) => {
 });
 
 // BUG #3: DELETE doesn't verify task exists before deleting
+// app.delete('/api/tasks/:id', (req, res) => {
+//   const id = parseInt(req.params.id);
+//   tasks = tasks.filter(t => t.id !== id);
+//   // Missing: check if task existed, return 404 if not
+//   res.json({ message: 'Deleted' }); // always returns success even if task didn't exist
+// });
 app.delete('/api/tasks/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  tasks = tasks.filter(t => t.id !== id);
-  // Missing: check if task existed, return 404 if not
-  res.json({ message: 'Deleted' }); // always returns success even if task didn't exist
+  tasks = tasks.filter(t => t.id !== req.params.id);
+  res.json({ message: 'Deleted' });
 });
 
 // Stats endpoint
